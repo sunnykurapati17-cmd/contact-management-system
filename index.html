@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact Manager</title>
+  <style>
+    :root { --primary:#4f46e5; --dark:#1f2937; --muted:#6b7280; --bg:#f4f6fb; --danger:#dc2626; --success:#059669; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, sans-serif; background:var(--bg); color:var(--dark); }
+    header { background:linear-gradient(135deg,#4f46e5,#7c3aed); color:#fff; padding:28px 20px; }
+    header div, main { max-width:1100px; margin:auto; }
+    h1 { margin:0 0 6px; font-size:28px; }
+    header p { margin:0; opacity:.9; }
+    main { padding:24px 20px 48px; }
+    .grid { display:grid; grid-template-columns:340px 1fr; gap:22px; align-items:start; }
+    .panel { background:#fff; border-radius:14px; padding:22px; box-shadow:0 8px 22px rgba(31,41,55,.08); }
+    h2 { font-size:20px; margin:0 0 18px; }
+    label { display:block; margin:12px 0 6px; font-size:14px; font-weight:700; }
+    input, select, textarea { width:100%; padding:11px 12px; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+    textarea { min-height:72px; resize:vertical; }
+    input:focus, select:focus, textarea:focus { outline:2px solid #c7d2fe; border-color:var(--primary); }
+    .button-row { display:flex; gap:10px; margin-top:18px; }
+    button { border:0; border-radius:8px; padding:11px 14px; font-weight:700; cursor:pointer; font:inherit; }
+    .primary { background:var(--primary); color:white; }
+    .secondary { background:#e5e7eb; color:var(--dark); }
+    .danger { background:#fee2e2; color:var(--danger); }
+    .toolbar { display:flex; justify-content:space-between; gap:12px; margin-bottom:16px; }
+    .toolbar input { max-width:400px; }
+    .count { color:var(--muted); font-size:14px; white-space:nowrap; align-self:center; }
+    .contacts { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; }
+    .contact { border:1px solid #e5e7eb; border-radius:12px; padding:16px; background:#fff; }
+    .contact-top { display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+    .contact h3 { margin:0; font-size:18px; word-break:break-word; }
+    .badge { background:#e0e7ff; color:#3730a3; border-radius:99px; padding:4px 8px; font-size:12px; font-weight:700; white-space:nowrap; }
+    .contact p { margin:10px 0 0; color:#4b5563; font-size:14px; overflow-wrap:anywhere; }
+    .actions { display:flex; gap:8px; margin-top:16px; }
+    .actions button { padding:8px 10px; font-size:13px; }
+    .empty { text-align:center; padding:48px 12px; color:var(--muted); border:2px dashed #d1d5db; border-radius:12px; }
+    .message { min-height:20px; color:var(--success); font-size:14px; margin-top:12px; }
+    @media (max-width:760px) { .grid { grid-template-columns:1fr; } .toolbar { flex-direction:column; } .toolbar input { max-width:none; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>Contact Manager</h1><p>Add, search, edit, and delete contacts. Data is saved in this browser.</p></div></header>
+  <main>
+    <div class="grid">
+      <section class="panel">
+        <h2 id="formTitle">Add Contact</h2>
+        <form id="contactForm">
+          <input type="hidden" id="contactId" />
+          <label for="name">Full name *</label>
+          <input id="name" type="text" required placeholder="e.g., Priya Kumar" />
+          <label for="phone">Phone *</label>
+          <input id="phone" type="tel" required placeholder="e.g., +91 98765 43210" />
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="e.g., priya@example.com" />
+          <label for="category">Category</label>
+          <select id="category"><option>Personal</option><option>Work</option><option>Family</option><option>Friend</option><option>Other</option></select>
+          <label for="notes">Notes</label>
+          <textarea id="notes" placeholder="Optional notes"></textarea>
+          <div class="button-row"><button class="primary" type="submit" id="submitButton">Add Contact</button><button class="secondary" type="button" id="cancelButton" hidden>Cancel</button></div>
+          <div class="message" id="message"></div>
+        </form>
+      </section>
+      <section class="panel">
+        <div class="toolbar"><input id="search" type="search" placeholder="Search by name, phone, email, or category..." /><span class="count" id="count"></span></div>
+        <div class="contacts" id="contacts"></div>
+      </section>
+    </div>
+  </main>
+  <script>
+    const STORAGE_KEY = 'contact-manager-contacts';
+    const form = document.getElementById('contactForm');
+    const fields = ['contactId','name','phone','email','category','notes'].reduce((o,id)=>(o[id]=document.getElementById(id),o),{});
+    const contactsEl = document.getElementById('contacts');
+    const searchEl = document.getElementById('search');
+    const countEl = document.getElementById('count');
+    const formTitle = document.getElementById('formTitle');
+    const submitButton = document.getElementById('submitButton');
+    const cancelButton = document.getElementById('cancelButton');
+    const message = document.getElementById('message');
+
+    let contacts = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const escapeHtml = text => String(text || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(contacts));
+
+    function render() {
+      const q = searchEl.value.trim().toLowerCase();
+      const filtered = contacts.filter(c => [c.name,c.phone,c.email,c.category,c.notes].join(' ').toLowerCase().includes(q));
+      countEl.textContent = `${filtered.length} contact${filtered.length === 1 ? '' : 's'}`;
+      if (!filtered.length) { contactsEl.innerHTML = `<div class="empty">${contacts.length ? 'No contacts match your search.' : 'No contacts yet. Add your first contact using the form.'}</div>`; return; }
+      contactsEl.innerHTML = filtered.map(c => `<article class="contact"><div class="contact-top"><h3>${escapeHtml(c.name)}</h3><span class="badge">${escapeHtml(c.category)}</span></div><p>📞 ${escapeHtml(c.phone)}</p>${c.email ? `<p>✉️ ${escapeHtml(c.email)}</p>` : ''}${c.notes ? `<p>📝 ${escapeHtml(c.notes)}</p>` : ''}<div class="actions"><button class="secondary" onclick="editContact('${c.id}')">Edit</button><button class="danger" onclick="deleteContact('${c.id}')">Delete</button></div></article>`).join('');
+    }
+
+    function resetForm() {
+      form.reset(); fields.contactId.value = ''; formTitle.textContent = 'Add Contact'; submitButton.textContent = 'Add Contact'; cancelButton.hidden = true;
+    }
+
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const contact = { id: fields.contactId.value || crypto.randomUUID(), name: fields.name.value.trim(), phone: fields.phone.value.trim(), email: fields.email.value.trim(), category: fields.category.value, notes: fields.notes.value.trim() };
+      if (fields.contactId.value) { contacts = contacts.map(c => c.id === contact.id ? contact : c); message.textContent = 'Contact updated successfully.'; }
+      else { contacts.unshift(contact); message.textContent = 'Contact added successfully.'; }
+      save(); resetForm(); render(); setTimeout(() => message.textContent = '', 2500);
+    });
+
+    window.editContact = id => {
+      const c = contacts.find(item => item.id === id); if (!c) return;
+      Object.keys(fields).forEach(key => fields[key].value = c[key] || '');
+      formTitle.textContent = 'Edit Contact'; submitButton.textContent = 'Update Contact'; cancelButton.hidden = false; window.scrollTo({top:0, behavior:'smooth'});
+    };
+    window.deleteContact = id => { if (confirm('Delete this contact?')) { contacts = contacts.filter(c => c.id !== id); save(); render(); } };
+    cancelButton.addEventListener('click', resetForm);
+    searchEl.addEventListener('input', render);
+    render();
+  </script>
+</body>
+</html>
